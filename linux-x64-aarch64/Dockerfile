@@ -2,10 +2,17 @@
 
 FROM ubuntu:24.04
 
-RUN set -eux; \
+RUN --mount=type=cache,id=apt-cache-ubuntu-24.04,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib-ubuntu-24.04,target=/var/lib/apt,sharing=locked \
+    set -eux; \
     export DEBIAN_FRONTEND=noninteractive; \
     \
-    # 1) Install required packages
+    # 1) Enable apt cache retention (temporary)
+    mv /etc/apt/apt.conf.d/docker-clean /tmp/; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+        > /etc/apt/apt.conf.d/keep-cache; \
+    \
+    # 2) Install required packages
     apt-get update; \
     apt-get install -y --no-install-recommends \
         # build
@@ -25,9 +32,9 @@ RUN set -eux; \
         qemu-user-static \
         binfmt-support; \
     \
-    # 2) Clean
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/*
+    # 3) Restore default apt clean behavior
+    rm -f /etc/apt/apt.conf.d/keep-cache; \
+    mv /tmp/docker-clean /etc/apt/apt.conf.d/
 
 COPY <<'EOF' /opt/toolchains/aarch64-linux-gnu.cmake
 set(CMAKE_SYSTEM_NAME      Linux)
@@ -44,5 +51,5 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 EOF
 
-ENV QEMU_LD_PREFIX=/usr/aarch64-linux-gnu \
+ENV AARCH64_SYSROOT=/usr/aarch64-linux-gnu \
     AARCH64_CMAKE_TOOLCHAIN_FILE=/opt/toolchains/aarch64-linux-gnu.cmake
