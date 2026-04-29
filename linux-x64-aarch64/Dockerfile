@@ -12,7 +12,10 @@ RUN --mount=type=cache,id=apt-cache-ubuntu-24.04,target=/var/cache/apt,sharing=l
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
         > /etc/apt/apt.conf.d/keep-cache; \
     \
-    # 2) Install required packages
+    # 2) Enable i386 multi-arch (for native execution of i686 binaries)
+    dpkg --add-architecture i386; \
+    \
+    # 3) Install required packages
     apt-get update; \
     apt-get install -y --no-install-recommends \
         # build
@@ -24,17 +27,36 @@ RUN --mount=type=cache,id=apt-cache-ubuntu-24.04,target=/var/cache/apt,sharing=l
         build-essential \
         ca-certificates \
         file \
+        # i686 (32-bit x86) cross toolchain
+        gcc-i686-linux-gnu \
+        g++-i686-linux-gnu \
+        # 32-bit x86 runtime
+        libc6:i386 \
         # aarch64 cross toolchain
         gcc-aarch64-linux-gnu \
         g++-aarch64-linux-gnu \
-        binutils-aarch64-linux-gnu \
         # run aarch64 binaries on x86_64 host
         qemu-user-static \
         binfmt-support; \
     \
-    # 3) Restore default apt clean behavior
+    # 4) Restore default apt clean behavior
     rm -f /etc/apt/apt.conf.d/keep-cache; \
     mv /tmp/docker-clean /etc/apt/apt.conf.d/
+
+COPY <<'EOF' /opt/toolchains/i686-linux-gnu.cmake
+set(CMAKE_SYSTEM_NAME      Linux)
+set(CMAKE_SYSTEM_PROCESSOR i686)
+
+set(CMAKE_C_COMPILER   i686-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER i686-linux-gnu-g++)
+
+set(CMAKE_FIND_ROOT_PATH /usr/i686-linux-gnu)
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+EOF
 
 COPY <<'EOF' /opt/toolchains/aarch64-linux-gnu.cmake
 set(CMAKE_SYSTEM_NAME      Linux)
@@ -51,5 +73,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 EOF
 
-ENV AARCH64_SYSROOT=/usr/aarch64-linux-gnu \
+ENV I686_SYSROOT=/usr/i686-linux-gnu \
+    I686_CMAKE_TOOLCHAIN_FILE=/opt/toolchains/i686-linux-gnu.cmake \
+    AARCH64_SYSROOT=/usr/aarch64-linux-gnu \
     AARCH64_CMAKE_TOOLCHAIN_FILE=/opt/toolchains/aarch64-linux-gnu.cmake
