@@ -18,7 +18,7 @@ RUN --mount=type=cache,id=apt-cache-ubuntu-24.04,target=/var/cache/apt,sharing=l
     # 3) Install required packages
     apt-get update; \
     apt-get install -y --no-install-recommends \
-        # build
+        # build & package
         git \
         cmake \
         make \
@@ -27,6 +27,7 @@ RUN --mount=type=cache,id=apt-cache-ubuntu-24.04,target=/var/cache/apt,sharing=l
         build-essential \
         ca-certificates \
         file \
+        zip \
         # i686 (32-bit x86) cross toolchain
         gcc-i686-linux-gnu \
         g++-i686-linux-gnu \
